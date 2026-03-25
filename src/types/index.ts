@@ -56,3 +56,15 @@ export interface AutoRefreshSettings {
   intervalHours: 1 | 6 | 12 | 24;
   lastUpdatedAt: string | null;
 }
+
+export interface SlackSettings {
+  enabled: boolean;
+  webhookUrl: string;
+}
+
+export interface SlackNotificationData {
+  updatedCount: number;
+  viewIncreases: { title: string; videoId: string; increase: number; total: number }[];
+  channelChanges: { name: string; subscribers: number; change: number }[];
+  timestamp: string;
+}

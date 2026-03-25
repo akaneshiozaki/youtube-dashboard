@@ -2,117 +2,121 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { VideoCard, Stage } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/lib/supabase';
 
-const STORAGE_KEY = 'youtube-dashboard-videos';
+// ---- DB マッピング ----
 
-const SAMPLE_DATA: VideoCard[] = [
-  {
-    id: uuidv4(),
-    title: '2024年のYouTube戦略まとめ',
-    assignee: '田中',
-    publishDate: '2026-04-01',
-    notes: 'アナリティクスデータを使って解説する',
-    stage: 'published',
-    createdAt: new Date().toISOString(),
-    views: 12500,
-    likes: 480,
-    comments: 63,
-  },
-  {
-    id: uuidv4(),
-    title: '撮影機材レビュー2026',
-    assignee: '鈴木',
-    publishDate: '2026-04-10',
-    notes: '新しいカメラと比較検証',
-    stage: 'editing',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: uuidv4(),
-    title: 'チャンネル登録者10万人達成の軌跡',
-    assignee: '山田',
-    publishDate: '2026-04-20',
-    notes: '感謝動画、コメントを読み上げる',
-    stage: 'filming',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: uuidv4(),
-    title: 'ショート動画の伸ばし方',
-    assignee: '田中',
-    publishDate: '2026-05-01',
-    notes: 'アルゴリズム解説と実例紹介',
-    stage: 'planning',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: uuidv4(),
-    title: 'コラボ企画（未定）',
-    assignee: '鈴木',
-    publishDate: '',
-    notes: '他チャンネルとのコラボを検討中',
-    stage: 'idea',
-    createdAt: new Date().toISOString(),
-  },
-];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapFromDB(row: any): VideoCard {
+  return {
+    id: row.id,
+    title: row.title,
+    assignee: row.assignee ?? '',
+    publishDate: row.publish_date ?? '',
+    notes: row.notes ?? '',
+    stage: row.stage as Stage,
+    createdAt: row.created_at,
+    views: row.views ?? undefined,
+    likes: row.likes ?? undefined,
+    comments: row.comments ?? undefined,
+    youtubeVideoId: row.youtube_video_id ?? undefined,
+    thumbnail: row.thumbnail ?? undefined,
+  };
+}
+
+function mapToDB(v: Omit<VideoCard, 'id' | 'createdAt'>) {
+  return {
+    title: v.title,
+    assignee: v.assignee,
+    publish_date: v.publishDate,
+    notes: v.notes,
+    stage: v.stage,
+    views: v.views ?? null,
+    likes: v.likes ?? null,
+    comments: v.comments ?? null,
+    youtube_video_id: v.youtubeVideoId ?? null,
+    thumbnail: v.thumbnail ?? null,
+  };
+}
+
+function mapPartialToDB(v: Partial<VideoCard>) {
+  const row: Record<string, unknown> = {};
+  if (v.title !== undefined)         row.title = v.title;
+  if (v.assignee !== undefined)      row.assignee = v.assignee;
+  if (v.publishDate !== undefined)   row.publish_date = v.publishDate;
+  if (v.notes !== undefined)         row.notes = v.notes;
+  if (v.stage !== undefined)         row.stage = v.stage;
+  if ('views' in v)                  row.views = v.views ?? null;
+  if ('likes' in v)                  row.likes = v.likes ?? null;
+  if ('comments' in v)               row.comments = v.comments ?? null;
+  if ('youtubeVideoId' in v)         row.youtube_video_id = v.youtubeVideoId ?? null;
+  if ('thumbnail' in v)              row.thumbnail = v.thumbnail ?? null;
+  return row;
+}
+
+// ---- フック ----
 
 export function useVideos() {
   const [videos, setVideos] = useState<VideoCard[]>([]);
-  const [initialized, setInitialized] = useState(false);
 
+  // 初期ロード + リアルタイム購読
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setVideos(JSON.parse(stored));
-      } catch {
-        setVideos(SAMPLE_DATA);
-      }
-    } else {
-      setVideos(SAMPLE_DATA);
-    }
-    setInitialized(true);
-  }, []);
-
-  useEffect(() => {
-    if (initialized) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(videos));
-    }
-  }, [videos, initialized]);
-
-  const addVideo = useCallback((data: Omit<VideoCard, 'id' | 'createdAt'>) => {
-    const newVideo: VideoCard = {
-      ...data,
-      id: uuidv4(),
-      createdAt: new Date().toISOString(),
+    const load = async () => {
+      const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: true });
+      if (data) setVideos(data.map(mapFromDB));
     };
-    setVideos((prev) => [...prev, newVideo]);
-    return newVideo;
+    load();
+
+    const channel = supabase
+      .channel('videos-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'videos' }, (payload) => {
+        setVideos((prev) => {
+          if (prev.find((v) => v.id === payload.new.id)) return prev;
+          return [...prev, mapFromDB(payload.new)];
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'videos' }, (payload) => {
+        setVideos((prev) => prev.map((v) => v.id === payload.new.id ? mapFromDB(payload.new) : v));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'videos' }, (payload) => {
+        setVideos((prev) => prev.filter((v) => v.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const updateVideo = useCallback((id: string, data: Partial<VideoCard>) => {
-    setVideos((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, ...data } : v))
-    );
+  const addVideo = useCallback(async (data: Omit<VideoCard, 'id' | 'createdAt'>) => {
+    const { data: inserted } = await supabase.from('videos').insert([mapToDB(data)]).select().single();
+    if (inserted) {
+      setVideos((prev) => {
+        if (prev.find((v) => v.id === inserted.id)) return prev;
+        return [...prev, mapFromDB(inserted)];
+      });
+    }
   }, []);
 
-  const deleteVideo = useCallback((id: string) => {
+  const updateVideo = useCallback(async (id: string, data: Partial<VideoCard>) => {
+    await supabase.from('videos').update(mapPartialToDB(data)).eq('id', id);
+    setVideos((prev) => prev.map((v) => v.id === id ? { ...v, ...data } : v));
+  }, []);
+
+  const deleteVideo = useCallback(async (id: string) => {
+    await supabase.from('videos').delete().eq('id', id);
     setVideos((prev) => prev.filter((v) => v.id !== id));
   }, []);
 
-  const moveVideo = useCallback((id: string, stage: Stage) => {
-    setVideos((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, stage } : v))
-    );
+  const moveVideo = useCallback(async (id: string, stage: Stage) => {
+    await supabase.from('videos').update({ stage }).eq('id', id);
+    setVideos((prev) => prev.map((v) => v.id === id ? { ...v, stage } : v));
   }, []);
 
-  // 複数動画を一括更新（自動更新用）
-  const batchUpdateVideos = useCallback((updates: { id: string; data: Partial<VideoCard> }[]) => {
-    const map = new Map(updates.map((u) => [u.id, u.data]));
-    setVideos((prev) =>
-      prev.map((v) => (map.has(v.id) ? { ...v, ...map.get(v.id) } : v))
+  const batchUpdateVideos = useCallback(async (updates: { id: string; data: Partial<VideoCard> }[]) => {
+    await Promise.all(
+      updates.map(({ id, data }) => supabase.from('videos').update(mapPartialToDB(data)).eq('id', id))
     );
+    const map = new Map(updates.map((u) => [u.id, u.data]));
+    setVideos((prev) => prev.map((v) => map.has(v.id) ? { ...v, ...map.get(v.id) } : v));
   }, []);
 
   return { videos, addVideo, updateVideo, deleteVideo, moveVideo, batchUpdateVideos };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { VideoCard, Stage, ChannelData, SlackNotificationData } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useVideos } from '@/hooks/useVideos';
@@ -26,6 +26,11 @@ export default function Home() {
   const { videos, addVideo, updateVideo, deleteVideo, moveVideo, batchUpdateVideos } = useVideos();
   const { channels, addChannel, removeChannel, refreshChannel } = useChannels();
   const { slackSettings, updateSlackSettings } = useSlackSettings();
+
+  // slackSettings の最新値を常に参照できるよう ref で追跡
+  // useCallback 内のクロージャーが古い値を参照するのを防ぐ
+  const slackSettingsRef = useRef(slackSettings);
+  useEffect(() => { slackSettingsRef.current = slackSettings; }, [slackSettings]);
 
   const [activeTab, setActiveTab] = useState<Tab>('kanban');
   const [modalOpen, setModalOpen] = useState(false);
@@ -97,11 +102,13 @@ export default function Home() {
     const updatedCount = videoUpdates.length + channelUpdates.length;
     showToast(`✓ データを更新しました（${updatedCount}件）`);
 
-    if (slackSettings.enabled && slackSettings.webhookUrl) {
+    // ref から最新の slackSettings を取得することで、クロージャーの古い値を参照しない
+    const currentSlack = slackSettingsRef.current;
+    if (currentSlack.enabled && currentSlack.webhookUrl) {
       const notificationData: SlackNotificationData = { updatedCount, viewIncreases, channelChanges, timestamp: new Date().toISOString() };
-      try { await sendSlackNotification(notificationData, slackSettings.webhookUrl); } catch { /* ignore */ }
+      try { await sendSlackNotification(notificationData, currentSlack.webhookUrl); } catch { /* ignore */ }
     }
-  }, [videos, channels, batchUpdateVideos, refreshChannel, showToast, slackSettings]);
+  }, [videos, channels, batchUpdateVideos, refreshChannel, showToast]);
 
   const { settings, updateSettings, triggerRefresh, isRefreshing } = useAutoRefresh(handleRefreshAll);
 
@@ -114,12 +121,12 @@ export default function Home() {
         channelChanges: channels.map((c) => ({ name: c.name, subscribers: c.subscribers, change: 0 })),
         timestamp: new Date().toISOString(),
       };
-      await sendSlackNotification(notificationData, slackSettings.webhookUrl);
+      await sendSlackNotification(notificationData, slackSettingsRef.current.webhookUrl);
       showToast('✓ Slack通知を送信しました');
     } finally {
       setIsSendingSlack(false);
     }
-  }, [videos, channels, slackSettings.webhookUrl, showToast]);
+  }, [videos, channels, showToast]);
 
   // ── 条件付きレンダリング（Hook の後に置く）──
 

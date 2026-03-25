@@ -44,6 +44,12 @@ export default function KanbanCard({ video, onEdit, onDelete }: KanbanCardProps)
         </div>
 
         <div className="flex-1 min-w-0">
+          {video.thumbnail && (
+            <div className="mb-2 rounded-lg overflow-hidden -mx-0.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={video.thumbnail} alt="サムネイル" className="w-full h-auto" />
+            </div>
+          )}
           <p className="text-sm font-semibold text-gray-800 leading-tight mb-1 truncate">{video.title}</p>
 
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mb-2">

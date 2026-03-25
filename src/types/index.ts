@@ -20,4 +20,7 @@ export interface VideoCard {
   views?: number;
   likes?: number;
   comments?: number;
+  // YouTubeから取得したデータ
+  youtubeVideoId?: string;
+  thumbnail?: string;
 }

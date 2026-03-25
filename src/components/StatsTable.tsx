@@ -57,6 +57,7 @@ export default function StatsTable({ videos, onEdit }: StatsTableProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-xs text-gray-500">
+                <th className="px-5 py-3"></th>
                 <th className="text-left px-5 py-3 font-medium">タイトル</th>
                 <th className="text-left px-4 py-3 font-medium">担当者</th>
                 <th className="text-left px-4 py-3 font-medium">公開日</th>
@@ -74,8 +75,27 @@ export default function StatsTable({ videos, onEdit }: StatsTableProps) {
                   : '-';
                 return (
                   <tr key={video.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-2">
+                      {video.thumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={video.thumbnail} alt="" className="w-20 h-auto rounded-md" />
+                      ) : (
+                        <div className="w-20 h-11 bg-gray-100 rounded-md" />
+                      )}
+                    </td>
                     <td className="px-5 py-3 font-medium text-gray-800 max-w-[200px] truncate">
-                      {video.title}
+                      {video.youtubeVideoId ? (
+                        <a
+                          href={`https://www.youtube.com/watch?v=${video.youtubeVideoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-red-500 transition-colors"
+                        >
+                          {video.title}
+                        </a>
+                      ) : (
+                        video.title
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">{video.assignee || '-'}</td>
                     <td className="px-4 py-3 text-gray-500">

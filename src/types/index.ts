@@ -24,3 +24,23 @@ export interface VideoCard {
   youtubeVideoId?: string;
   thumbnail?: string;
 }
+
+export interface ChannelVideo {
+  videoId: string;
+  title: string;
+  thumbnail: string;
+  views: number;
+  publishedAt: string;
+}
+
+export interface ChannelData {
+  id: string;           // ローカルID（uuid）
+  channelId: string;    // YouTube チャンネルID
+  name: string;
+  icon: string;
+  subscribers: number;
+  totalViews: number;
+  videoCount: number;
+  topVideos: ChannelVideo[];
+  addedAt: string;
+}

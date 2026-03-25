@@ -6,8 +6,9 @@ import { useVideos } from '@/hooks/useVideos';
 import KanbanBoard from '@/components/KanbanBoard';
 import StatsTable from '@/components/StatsTable';
 import VideoModal from '@/components/VideoModal';
+import ChannelStats from '@/components/ChannelStats';
 
-type Tab = 'kanban' | 'stats';
+type Tab = 'kanban' | 'stats' | 'channels';
 
 export default function Home() {
   const { videos, addVideo, updateVideo, deleteVideo, moveVideo } = useVideos();
@@ -81,21 +82,31 @@ export default function Home() {
               >
                 視聴データ
               </button>
+              <button
+                onClick={() => setActiveTab('channels')}
+                className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+                  activeTab === 'channels' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                チャンネル統計
+              </button>
             </div>
 
-            <button
-              onClick={() => handleAdd('idea')}
-              className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <span className="text-base leading-none">+</span>
-              新規追加
-            </button>
+            {activeTab !== 'channels' && (
+              <button
+                onClick={() => handleAdd('idea')}
+                className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                <span className="text-base leading-none">+</span>
+                新規追加
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-screen-xl mx-auto px-4 py-5">
-        {activeTab === 'kanban' ? (
+        {activeTab === 'kanban' && (
           <KanbanBoard
             videos={videos}
             onAdd={handleAdd}
@@ -104,8 +115,12 @@ export default function Home() {
             onMove={moveVideo}
             onReorder={handleReorder}
           />
-        ) : (
+        )}
+        {activeTab === 'stats' && (
           <StatsTable videos={videos} onEdit={handleEdit} />
+        )}
+        {activeTab === 'channels' && (
+          <ChannelStats />
         )}
       </main>
 

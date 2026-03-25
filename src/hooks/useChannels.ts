@@ -14,7 +14,13 @@ export function useChannels() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        setChannels(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        // 旧データに allVideos がない場合は topVideos で補完
+        const migrated = parsed.map((c: ChannelData) => ({
+          ...c,
+          allVideos: c.allVideos ?? c.topVideos ?? [],
+        }));
+        setChannels(migrated);
       } catch {
         setChannels([]);
       }

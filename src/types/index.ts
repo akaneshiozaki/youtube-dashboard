@@ -30,7 +30,9 @@ export interface ChannelVideo {
   title: string;
   thumbnail: string;
   views: number;
+  likes: number;
   publishedAt: string;
+  durationSec: number;  // 動画の長さ（秒）。ショート判定に使用
 }
 
 export interface ChannelData {
@@ -41,6 +43,10 @@ export interface ChannelData {
   subscribers: number;
   totalViews: number;
   videoCount: number;
-  topVideos: ChannelVideo[];
+  topVideos: ChannelVideo[];  // 後方互換のために残す（全期間・全タイプのトップ5）
+  allVideos: ChannelVideo[];  // フィルタリング用（最大50本）
   addedAt: string;
 }
+
+export type PeriodFilter = '7d' | '30d' | '90d' | '1y' | 'all';
+export type VideoTypeFilter = 'all' | 'video' | 'short';

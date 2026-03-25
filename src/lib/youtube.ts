@@ -1,4 +1,4 @@
-import { ChannelData, ChannelVideo } from '@/types';
+import { ChannelData, ChannelVideo, PeriodFilter, VideoTypeFilter } from '@/types';
 
 export interface YouTubeVideoData {
   title: string;
@@ -112,7 +112,45 @@ export async function resolveChannelId(input: string): Promise<string> {
 }
 
 /**
- * チャンネルIDから統計・人気動画トップ5を取得する
+ * ISO 8601 duration (PT1H2M3S) を秒数に変換する
+ */
+function parseISO8601Duration(duration: string): number {
+  const m = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  return (parseInt(m[1] ?? '0') * 3600) + (parseInt(m[2] ?? '0') * 60) + parseInt(m[3] ?? '0');
+}
+
+/**
+ * 動画詳細（snippet + statistics + contentDetails）を一括取得して ChannelVideo[] に変換
+ */
+async function fetchVideoDetails(videoIds: string[], apiKey: string): Promise<ChannelVideo[]> {
+  if (videoIds.length === 0) return [];
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds.join(',')}&key=${apiKey}`
+  );
+  const data = await res.json();
+  return (data.items ?? []).map((v: {
+    id: string;
+    snippet: {
+      title: string;
+      thumbnails: { medium?: { url: string }; default?: { url: string } };
+      publishedAt: string;
+    };
+    statistics: { viewCount?: string; likeCount?: string };
+    contentDetails: { duration?: string };
+  }) => ({
+    videoId: v.id,
+    title: v.snippet.title,
+    thumbnail: v.snippet.thumbnails?.medium?.url ?? v.snippet.thumbnails?.default?.url ?? '',
+    views: parseInt(v.statistics.viewCount ?? '0', 10),
+    likes: parseInt(v.statistics.likeCount ?? '0', 10),
+    publishedAt: v.snippet.publishedAt,
+    durationSec: parseISO8601Duration(v.contentDetails.duration ?? 'PT0S'),
+  }));
+}
+
+/**
+ * チャンネルIDから統計・動画一覧（最大50本）を取得する
  */
 export async function fetchChannelData(input: string): Promise<Omit<ChannelData, 'id' | 'addedAt'>> {
   const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
@@ -132,34 +170,20 @@ export async function fetchChannelData(input: string): Promise<Omit<ChannelData,
   const snippet = ch.snippet;
   const stats = ch.statistics;
 
-  // 人気動画を取得（再生回数順）
+  // 人気動画を最大50本取得（再生回数順）
   const searchRes = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=viewCount&type=video&maxResults=5&key=${apiKey}`
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=viewCount&type=video&maxResults=50&key=${apiKey}`
   );
   const searchData = await searchRes.json();
   const videoIds: string[] = (searchData.items ?? []).map(
     (item: { id: { videoId: string } }) => item.id.videoId
   );
 
-  let topVideos: ChannelVideo[] = [];
-  if (videoIds.length > 0) {
-    const vRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds.join(',')}&key=${apiKey}`
-    );
-    const vData = await vRes.json();
-    topVideos = (vData.items ?? []).map((v: {
-      id: string;
-      snippet: { title: string; thumbnails: { medium?: { url: string }; default?: { url: string } }; publishedAt: string };
-      statistics: { viewCount?: string };
-    }) => ({
-      videoId: v.id,
-      title: v.snippet.title,
-      thumbnail: v.snippet.thumbnails?.medium?.url ?? v.snippet.thumbnails?.default?.url ?? '',
-      views: parseInt(v.statistics.viewCount ?? '0', 10),
-      publishedAt: v.snippet.publishedAt,
-    }));
-    topVideos.sort((a, b) => b.views - a.views);
-  }
+  // 詳細情報（duration含む）を取得。APIは最大50件を一括取得可能
+  const allVideos = await fetchVideoDetails(videoIds, apiKey);
+  allVideos.sort((a, b) => b.views - a.views);
+
+  const topVideos = allVideos.slice(0, 5);
 
   return {
     channelId,
@@ -169,5 +193,34 @@ export async function fetchChannelData(input: string): Promise<Omit<ChannelData,
     totalViews: parseInt(stats.viewCount ?? '0', 10),
     videoCount: parseInt(stats.videoCount ?? '0', 10),
     topVideos,
+    allVideos,
   };
+}
+
+/**
+ * フィルター条件に基づいて動画を絞り込む
+ */
+export function filterVideos(
+  videos: ChannelVideo[],
+  period: PeriodFilter,
+  type: VideoTypeFilter
+): ChannelVideo[] {
+  let result = [...videos];
+
+  // 期間フィルター（公開日基準）
+  if (period !== 'all') {
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 365;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    result = result.filter((v) => new Date(v.publishedAt) >= cutoff);
+  }
+
+  // 動画タイプフィルター（60秒以下 = ショート）
+  if (type === 'short') {
+    result = result.filter((v) => v.durationSec > 0 && v.durationSec <= 60);
+  } else if (type === 'video') {
+    result = result.filter((v) => v.durationSec > 60);
+  }
+
+  return result;
 }

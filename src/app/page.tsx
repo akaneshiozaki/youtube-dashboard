@@ -13,11 +13,12 @@ import KanbanBoard from '@/components/KanbanBoard';
 import StatsTable from '@/components/StatsTable';
 import VideoModal from '@/components/VideoModal';
 import ChannelStats from '@/components/ChannelStats';
+import Analytics from '@/components/Analytics';
 import AutoRefreshPanel from '@/components/AutoRefreshPanel';
 import Toast from '@/components/Toast';
 import LoginPage from '@/components/LoginPage';
 
-type Tab = 'kanban' | 'stats' | 'channels';
+type Tab = 'kanban' | 'stats' | 'channels' | 'analytics';
 
 export default function Home() {
   // ── すべての Hook を最上部で宣言（Rules of Hooks）──
@@ -186,13 +187,13 @@ export default function Home() {
 
             {/* タブ */}
             <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs">
-              {(['kanban', 'stats', 'channels'] as Tab[]).map((tab) => (
+              {(['kanban', 'stats', 'channels', 'analytics'] as Tab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`px-3 py-1.5 rounded-md font-medium transition-colors ${activeTab === tab ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'}`}
                 >
-                  {tab === 'kanban' ? 'カンバン' : tab === 'stats' ? '視聴データ' : 'チャンネル統計'}
+                  {tab === 'kanban' ? 'カンバン' : tab === 'stats' ? '視聴データ' : tab === 'channels' ? 'チャンネル統計' : '分析'}
                 </button>
               ))}
             </div>
@@ -245,7 +246,7 @@ export default function Home() {
             </div>
 
             {/* 新規追加 */}
-            {activeTab !== 'channels' && (
+            {activeTab !== 'channels' && activeTab !== 'analytics' && (
               <button
                 onClick={() => handleAdd('idea')}
                 className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -266,6 +267,7 @@ export default function Home() {
         {activeTab === 'channels' && (
           <ChannelStats channels={channels} addChannel={addChannel} removeChannel={removeChannel} refreshChannel={refreshChannel} />
         )}
+        {activeTab === 'analytics' && <Analytics channels={channels} />}
       </main>
 
       {modalOpen && (

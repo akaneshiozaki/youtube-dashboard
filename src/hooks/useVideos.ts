@@ -107,5 +107,13 @@ export function useVideos() {
     );
   }, []);
 
-  return { videos, addVideo, updateVideo, deleteVideo, moveVideo };
+  // 複数動画を一括更新（自動更新用）
+  const batchUpdateVideos = useCallback((updates: { id: string; data: Partial<VideoCard> }[]) => {
+    const map = new Map(updates.map((u) => [u.id, u.data]));
+    setVideos((prev) =>
+      prev.map((v) => (map.has(v.id) ? { ...v, ...map.get(v.id) } : v))
+    );
+  }, []);
+
+  return { videos, addVideo, updateVideo, deleteVideo, moveVideo, batchUpdateVideos };
 }

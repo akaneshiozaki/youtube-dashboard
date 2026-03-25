@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { ChannelData, ChannelVideo, PeriodFilter, VideoTypeFilter } from '@/types';
 import { fetchChannelData, filterVideos } from '@/lib/youtube';
-import { useChannels } from '@/hooks/useChannels';
 
 // ---- ユーティリティ ----
 
@@ -261,8 +260,14 @@ function VideoRow({ video, rank }: { video: ChannelVideo; rank: number }) {
 
 // ---- メインコンポーネント ----
 
-export default function ChannelStats() {
-  const { channels, addChannel, removeChannel, refreshChannel } = useChannels();
+interface ChannelStatsProps {
+  channels: ChannelData[];
+  addChannel: (data: Omit<ChannelData, 'id' | 'addedAt'>) => void;
+  removeChannel: (id: string) => void;
+  refreshChannel: (id: string, data: Omit<ChannelData, 'id' | 'addedAt'>) => void;
+}
+
+export default function ChannelStats({ channels, addChannel, removeChannel, refreshChannel }: ChannelStatsProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

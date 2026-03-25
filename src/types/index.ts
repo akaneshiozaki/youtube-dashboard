@@ -50,3 +50,9 @@ export interface ChannelData {
 
 export type PeriodFilter = '7d' | '30d' | '90d' | '1y' | 'all';
 export type VideoTypeFilter = 'all' | 'video' | 'short';
+
+export interface AutoRefreshSettings {
+  enabled: boolean;
+  intervalHours: 1 | 6 | 12 | 24;
+  lastUpdatedAt: string | null;
+}
